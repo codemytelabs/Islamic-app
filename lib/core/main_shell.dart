@@ -15,15 +15,15 @@ class _MainShellState extends State<MainShell> {
   static const List<NafasNavItem> _tabs = [
     NafasNavItem(label: 'Home', icon: Icons.home_rounded),
     NafasNavItem(label: 'Prayers', icon: Icons.mosque_rounded),
-    NafasNavItem(label: 'Ibadah', icon: Icons.self_improvement_rounded),
+    NafasNavItem(label: 'Quran', icon: Icons.menu_book_rounded),
     NafasNavItem(label: 'Tools', icon: Icons.handyman_rounded),
-    NafasNavItem(label: 'Guidance', icon: Icons.auto_stories_rounded),
+    NafasNavItem(label: 'Guidance', icon: Icons.tips_and_updates_rounded),
   ];
 
   static const List<Widget> _pages = [
     _HomeTab(),
     _PrayersTab(),
-    _IbadahTab(),
+    _QuranTab(),
     _ToolsTab(),
     _GuidanceTab(),
   ];
@@ -96,34 +96,34 @@ class _PrayersTab extends StatelessWidget {
   }
 }
 
-class _IbadahTab extends StatelessWidget {
-  const _IbadahTab();
+class _QuranTab extends StatelessWidget {
+  const _QuranTab();
 
   @override
   Widget build(BuildContext context) {
     return const CharmSection(
-      title: 'Ibadah',
-      subtitle: 'Daily worship essentials',
+      title: 'Quran',
+      subtitle: 'Read, reflect, and stay connected',
       items: [
         CharmItemData(
-          'Adhkar',
-          'Morning and evening adhkar',
+          'Read Quran',
+          'Continue from your last ayah',
           Icons.menu_book_rounded,
         ),
         CharmItemData(
-          'Tasbih',
-          'Digital tasbih counter',
-          Icons.radio_button_checked_rounded,
+          'Bookmarks',
+          'Quick access to saved surahs',
+          Icons.bookmarks_rounded,
         ),
         CharmItemData(
-          'Fasting',
-          'Track fasting days',
-          Icons.nights_stay_rounded,
+          'Tafsir',
+          'Understand verses with explanations',
+          Icons.chrome_reader_mode_rounded,
         ),
         CharmItemData(
-          'Sadaqah',
-          'Manage charity intentions',
-          Icons.volunteer_activism_rounded,
+          'Audio Recitation',
+          'Listen by your preferred reciter',
+          Icons.graphic_eq_rounded,
         ),
       ],
     );
@@ -164,6 +164,26 @@ class _GuidanceTab extends StatelessWidget {
       subtitle: 'Learn and reflect every day',
       items: [
         CharmItemData('Duas', 'Curated daily duas', Icons.favorite_rounded),
+        CharmItemData(
+          'Adhkar',
+          'Morning and evening adhkar',
+          Icons.menu_book_rounded,
+        ),
+        CharmItemData(
+          'Tasbih',
+          'Digital tasbih counter',
+          Icons.radio_button_checked_rounded,
+        ),
+        CharmItemData(
+          'Fasting',
+          'Track fasting days',
+          Icons.nights_stay_rounded,
+        ),
+        CharmItemData(
+          'Sadaqah',
+          'Manage charity intentions',
+          Icons.volunteer_activism_rounded,
+        ),
         CharmItemData(
           'Reflections',
           'Short spiritual reflections',

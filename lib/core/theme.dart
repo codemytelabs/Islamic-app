@@ -6,7 +6,7 @@ class AppTheme {
       primary: Color(0xFF3B82F6),
       onPrimary: Colors.white,
       primaryContainer: Color(0xFFDBEAFE),
-      onPrimaryContainer: Color(0xFF1E3A8A),
+      onPrimaryContainer: Color.fromARGB(255, 22, 50, 128),
       secondary: Color(0xFF60A5FA),
       onSecondary: Colors.white,
       surface: Colors.white,
