@@ -1,0 +1,43 @@
+import 'package:flutter/material.dart';
+
+class NafasNavItem {
+  final String label;
+  final IconData icon;
+
+  const NafasNavItem({required this.label, required this.icon});
+}
+
+class NafasBottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final List<NafasNavItem> items;
+  final ValueChanged<int> onDestinationSelected;
+
+  const NafasBottomNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.items,
+    required this.onDestinationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: onDestinationSelected,
+        indicatorColor: colors.primaryContainer,
+        destinations: items
+            .map(
+              (item) => NavigationDestination(
+                icon: Icon(item.icon),
+                label: item.label,
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+}
