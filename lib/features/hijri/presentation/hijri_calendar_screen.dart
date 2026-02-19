@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
+import '../data/hijri_notes_store.dart';
+import '../domain/hijri_note.dart';
 
 class HijriCalendarScreen extends StatelessWidget {
   const HijriCalendarScreen({super.key});
@@ -63,6 +65,7 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
 
   late final PageController _pageController;
   late int _currentPage;
+  List<HijriNote> _notes = const [];
 
   @override
   void initState() {
@@ -71,6 +74,13 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
     final todayHijri = HijriCalendar.now();
     _currentPage = _toPage(todayHijri.hYear, todayHijri.hMonth);
     _pageController = PageController(initialPage: _currentPage);
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    final notes = await HijriNotesStore.load();
+    if (!mounted) return;
+    setState(() => _notes = notes);
   }
 
   int _toPage(int year, int month) => ((year - _minYear) * 12) + (month - 1);
@@ -91,6 +101,8 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final (year, month) = _fromPage(_currentPage);
+    final monthNotes = _notesForMonth(year, month);
+    final daysWithNotes = monthNotes.map((n) => n.hDay).toSet();
 
     return Column(
       children: [
@@ -153,17 +165,284 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
         ),
         const SizedBox(height: 8),
         Expanded(
+          flex: 3,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentPage = index),
             itemCount: (_maxYear - _minYear + 1) * 12,
             itemBuilder: (context, index) {
               final (pageYear, pageMonth) = _fromPage(index);
-              return _HijriMonthGrid(year: pageYear, month: pageMonth);
+              final monthDaysWithNotes = _notes
+                  .where((n) => n.hYear == pageYear && n.hMonth == pageMonth)
+                  .map((n) => n.hDay)
+                  .toSet();
+
+              return _HijriMonthGrid(
+                year: pageYear,
+                month: pageMonth,
+                daysWithNotes: monthDaysWithNotes,
+                onDayTap: (day) => _openAddNoteSheet(pageYear, pageMonth, day),
+              );
             },
           ),
         ),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+          child: Row(
+            children: [
+              Text(
+                'Month Notes',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: colors.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${monthNotes.length}',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: colors.onTertiaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_months[month - 1]} $year AH',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: monthNotes.isEmpty
+              ? Center(
+                  child: Text(
+                    'No notes for this month yet',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  itemCount: monthNotes.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final note = monthNotes[index];
+                    final isPast = _dayOnly(
+                      note.gDate,
+                    ).isBefore(_dayOnly(DateTime.now()));
+
+                    return Card(
+                      margin: EdgeInsets.zero,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: colors.outlineVariant),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${note.hDay} ${_months[note.hMonth - 1]} ${note.hYear} AH',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                          color: colors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isPast
+                                        ? const Color(0xFFFEE2E2)
+                                        : colors.primaryContainer,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    isPast ? 'Passed' : 'Upcoming',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: isPast
+                                              ? const Color(0xFF991B1B)
+                                              : colors.onPrimaryContainer,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              MaterialLocalizations.of(
+                                context,
+                              ).formatMediumDate(note.gDate),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: const Color(0xFF6B7280)),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(note.content),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ],
+    );
+  }
+
+  List<HijriNote> _notesForMonth(int year, int month) {
+    final list = _notes
+        .where((n) => n.hYear == year && n.hMonth == month)
+        .toList(growable: true);
+
+    final today = _dayOnly(DateTime.now());
+    list.sort((a, b) {
+      final aDate = _dayOnly(a.gDate);
+      final bDate = _dayOnly(b.gDate);
+
+      final aIsFutureOrToday = !aDate.isBefore(today);
+      final bIsFutureOrToday = !bDate.isBefore(today);
+
+      if (aIsFutureOrToday != bIsFutureOrToday) {
+        return aIsFutureOrToday ? -1 : 1;
+      }
+
+      if (aIsFutureOrToday) {
+        return aDate.compareTo(bDate);
+      }
+
+      return bDate.compareTo(aDate);
+    });
+
+    return list;
+  }
+
+  DateTime _dayOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  Future<void> _openAddNoteSheet(int year, int month, int day) async {
+    final textController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final gDate = HijriCalendar().hijriToGregorian(year, month, day);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 8,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add Note',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$day ${_months[month - 1]} $year AH • ${MaterialLocalizations.of(context).formatMediumDate(gDate)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: textController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Write your note or todo...',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a note';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () async {
+                          if (!formKey.currentState!.validate()) return;
+                          final note = HijriNote(
+                            id: DateTime.now().microsecondsSinceEpoch
+                                .toString(),
+                            hYear: year,
+                            hMonth: month,
+                            hDay: day,
+                            gDate: _dayOnly(gDate),
+                            content: textController.text.trim(),
+                            createdAt: DateTime.now(),
+                          );
+
+                          final updatedNotes = [..._notes, note];
+                          await HijriNotesStore.save(updatedNotes);
+
+                          if (!mounted) return;
+                          setState(() => _notes = updatedNotes);
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -171,8 +450,15 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
 class _HijriMonthGrid extends StatelessWidget {
   final int year;
   final int month;
+  final Set<int> daysWithNotes;
+  final ValueChanged<int> onDayTap;
 
-  const _HijriMonthGrid({required this.year, required this.month});
+  const _HijriMonthGrid({
+    required this.year,
+    required this.month,
+    required this.daysWithNotes,
+    required this.onDayTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -201,37 +487,53 @@ class _HijriMonthGrid extends StatelessWidget {
         final day = (index - leadingEmpty) + 1;
         final gregorianDay = helper.hijriToGregorian(year, month, day).day;
         final isToday = isCurrentMonth && today.hDay == day;
+        final hasNote = daysWithNotes.contains(day);
 
         return Center(
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isToday ? colors.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '$day',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
-                    color: isToday ? colors.onPrimary : colors.onSurface,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => onDayTap(day),
+            child: Container(
+              width: 40,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isToday ? colors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$day',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
+                      color: isToday ? colors.onPrimary : colors.onSurface,
+                    ),
                   ),
-                ),
-                Text(
-                  '$gregorianDay',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w500,
-                    color: isToday
-                        ? colors.onPrimary.withValues(alpha: 0.85)
-                        : const Color(0xFF9CA3AF),
+                  Text(
+                    '$gregorianDay',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: isToday
+                          ? colors.onPrimary.withValues(alpha: 0.85)
+                          : const Color(0xFF9CA3AF),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 1),
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: hasNote
+                          ? (isToday ? colors.onPrimary : colors.tertiary)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
