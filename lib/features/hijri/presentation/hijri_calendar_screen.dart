@@ -102,7 +102,6 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
     final colors = Theme.of(context).colorScheme;
     final (year, month) = _fromPage(_currentPage);
     final monthNotes = _notesForMonth(year, month);
-    final daysWithNotes = monthNotes.map((n) => n.hDay).toSet();
 
     return Column(
       children: [
@@ -181,7 +180,8 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
                 year: pageYear,
                 month: pageMonth,
                 daysWithNotes: monthDaysWithNotes,
-                onDayTap: (day) => _openAddNoteSheet(pageYear, pageMonth, day),
+                onDayTap: (day) =>
+                    _openNoteSheet(year: pageYear, month: pageMonth, day: day),
               );
             },
           ),
@@ -271,6 +271,29 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
                                         ),
                                   ),
                                 ),
+                                IconButton(
+                                  tooltip: 'Edit note',
+                                  onPressed: () => _openNoteSheet(
+                                    year: note.hYear,
+                                    month: note.hMonth,
+                                    day: note.hDay,
+                                    existingNote: note,
+                                  ),
+                                  icon: Icon(
+                                    Icons.edit_rounded,
+                                    size: 18,
+                                    color: colors.primary,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete note',
+                                  onPressed: () => _deleteNote(note),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 18,
+                                    color: Color(0xFFB91C1C),
+                                  ),
+                                ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 7,
@@ -348,10 +371,18 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
   DateTime _dayOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
-  Future<void> _openAddNoteSheet(int year, int month, int day) async {
-    final textController = TextEditingController();
+  Future<void> _openNoteSheet({
+    required int year,
+    required int month,
+    required int day,
+    HijriNote? existingNote,
+  }) async {
+    final textController = TextEditingController(
+      text: existingNote?.content ?? '',
+    );
     final formKey = GlobalKey<FormState>();
     final gDate = HijriCalendar().hijriToGregorian(year, month, day);
+    final isEditing = existingNote != null;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -372,7 +403,7 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Add Note',
+                  isEditing ? 'Edit Note' : 'Add Note',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -415,24 +446,38 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
                           final note = HijriNote(
-                            id: DateTime.now().microsecondsSinceEpoch
-                                .toString(),
+                            id:
+                                existingNote?.id ??
+                                DateTime.now().microsecondsSinceEpoch
+                                    .toString(),
                             hYear: year,
                             hMonth: month,
                             hDay: day,
                             gDate: _dayOnly(gDate),
                             content: textController.text.trim(),
-                            createdAt: DateTime.now(),
+                            createdAt:
+                                existingNote?.createdAt ?? DateTime.now(),
                           );
 
-                          final updatedNotes = [..._notes, note];
+                          final updatedNotes = [..._notes];
+                          if (isEditing) {
+                            final index = updatedNotes.indexWhere(
+                              (n) => n.id == existingNote.id,
+                            );
+                            if (index != -1) {
+                              updatedNotes[index] = note;
+                            }
+                          } else {
+                            updatedNotes.add(note);
+                          }
+
                           await HijriNotesStore.save(updatedNotes);
 
                           if (!mounted) return;
                           setState(() => _notes = updatedNotes);
                           Navigator.of(context).pop();
                         },
-                        child: const Text('Save'),
+                        child: Text(isEditing ? 'Update' : 'Save'),
                       ),
                     ),
                   ],
@@ -444,6 +489,38 @@ class _HijriCalendarTabState extends State<_HijriCalendarTab> {
         );
       },
     );
+  }
+
+  Future<void> _deleteNote(HijriNote note) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete note?'),
+          content: const Text('This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    final updatedNotes = _notes.where((n) => n.id != note.id).toList();
+    await HijriNotesStore.save(updatedNotes);
+
+    if (!mounted) return;
+    setState(() => _notes = updatedNotes);
   }
 }
 
@@ -606,6 +683,7 @@ class _HijriConverterTabState extends State<_HijriConverterTab> {
       children: [
         Card(
           elevation: 0,
+          color: colors.primaryContainer.withValues(alpha: 0.28),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: colors.outlineVariant),
@@ -655,6 +733,7 @@ class _HijriConverterTabState extends State<_HijriConverterTab> {
         const SizedBox(height: 12),
         Card(
           elevation: 0,
+          color: colors.tertiaryContainer.withValues(alpha: 0.28),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: colors.outlineVariant),
