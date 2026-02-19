@@ -15,8 +15,8 @@ class _MainShellState extends State<MainShell> {
 
   static const List<NafasNavItem> _tabs = [
     NafasNavItem(label: 'Home', icon: Icons.home_rounded),
-      NafasNavItem(label: 'Prayers', icon: Icons.mosque_rounded),
-      NafasNavItem(label: 'Quran', icon: Icons.menu_book_rounded),
+    NafasNavItem(label: 'Prayers', icon: Icons.mosque_rounded),
+    NafasNavItem(label: 'Quran', icon: Icons.menu_book_rounded),
     NafasNavItem(label: 'Guidance', icon: Icons.tips_and_updates_rounded),
     NafasNavItem(label: 'Tools', icon: Icons.widgets_rounded),
   ];
@@ -24,8 +24,6 @@ class _MainShellState extends State<MainShell> {
   static const List<Widget> _pages = [
     _HomeTab(),
     _SectionPage(
-      title: 'Prayers',
-      subtitle: 'Prayer times and Qibla tools',
       entries: [
         _EntryData(
           'Prayer Times',
@@ -34,10 +32,9 @@ class _MainShellState extends State<MainShell> {
         ),
         _EntryData('Qibla', 'Find the Qibla direction', Icons.explore_rounded),
       ],
+      topWidget: HomeHijriLocationCard(),
     ),
     _SectionPage(
-      title: 'Quran',
-      subtitle: 'Read, reflect, and stay connected',
       entries: [
         _EntryData(
           'Read Quran',
@@ -62,8 +59,6 @@ class _MainShellState extends State<MainShell> {
       ],
     ),
     _SectionPage(
-      title: 'Guidance',
-      subtitle: 'Daily learning and spiritual growth',
       entries: [
         _EntryData('Duas', 'Curated daily duas', Icons.favorite_rounded),
         _EntryData(
@@ -95,8 +90,6 @@ class _MainShellState extends State<MainShell> {
       ],
     ),
     _SectionPage(
-      title: 'Tools',
-      subtitle: 'Practical Islamic utilities',
       entries: [
         _EntryData(
           'Zakat Calculator',
@@ -127,7 +120,7 @@ class _MainShellState extends State<MainShell> {
         title: Text(_tabs[_selectedIndex].label),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
+            icon: const Icon(Icons.notifications_rounded),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Notifications coming soon')),
@@ -135,7 +128,7 @@ class _MainShellState extends State<MainShell> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
+            icon: const Icon(Icons.account_circle_rounded),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Profile coming soon')),
@@ -145,7 +138,7 @@ class _MainShellState extends State<MainShell> {
           const SizedBox(width: 4),
         ],
       ),
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: _pages[_selectedIndex],
       bottomNavigationBar: NafasBottomNavBar(
         selectedIndex: _selectedIndex,
         items: _tabs,
@@ -162,8 +155,6 @@ class _HomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _SectionPage(
-      title: 'Today Overview',
-      subtitle: 'Next prayer, streak, and reminders in one place',
       entries: [
         _EntryData(
           'Next Prayer',
@@ -187,17 +178,10 @@ class _HomeTab extends StatelessWidget {
 }
 
 class _SectionPage extends StatelessWidget {
-  final String title;
-  final String subtitle;
   final List<_EntryData> entries;
   final Widget? topWidget;
 
-  const _SectionPage({
-    required this.title,
-    required this.subtitle,
-    required this.entries,
-    this.topWidget,
-  });
+  const _SectionPage({required this.entries, this.topWidget});
 
   @override
   Widget build(BuildContext context) {
@@ -206,24 +190,13 @@ class _SectionPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: colors.primary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF4B5563)),
-        ),
-        const SizedBox(height: 14),
+        if (topWidget != null) const SizedBox(height: 2),
         if (topWidget != null) topWidget!,
-        ...entries.map(
-          (entry) => Card(
+        ...entries.map((entry) {
+          final iconBackground = colors.tertiaryContainer;
+          final iconColor = colors.onTertiaryContainer;
+
+          return Card(
             elevation: 0,
             margin: const EdgeInsets.only(bottom: 10),
             shape: RoundedRectangleBorder(
@@ -231,14 +204,21 @@ class _SectionPage extends StatelessWidget {
               side: BorderSide(color: colors.outlineVariant),
             ),
             child: ListTile(
-              leading: Icon(entry.icon, color: colors.primary),
+              leading: CircleAvatar(
+                radius: 18,
+                backgroundColor: iconBackground,
+                child: Icon(entry.icon, color: iconColor),
+              ),
               title: Text(entry.title),
               subtitle: Text(entry.subtitle),
-              trailing: const Icon(Icons.chevron_right_rounded),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: colors.secondary,
+              ),
               onTap: () {},
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }

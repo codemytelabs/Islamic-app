@@ -290,13 +290,8 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final today = DateTime.now();
     HijriCalendar.setLocal('en');
     final hijri = HijriCalendar.now();
-
-    final englishDate = MaterialLocalizations.of(
-      context,
-    ).formatMediumDate(today);
     final hijriDayMonth = hijri.toFormat('dd MMMM');
     final hijriYear = '${hijri.hYear} AH';
 
@@ -304,7 +299,11 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors.primaryContainer,
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [colors.onPrimaryContainer, colors.primary],
+        ),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -316,7 +315,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
                 Text(
                   hijriDayMonth,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.onPrimaryContainer,
+                    color: colors.onPrimary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -324,15 +323,8 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
                 Text(
                   hijriYear,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colors.onPrimaryContainer,
+                    color: colors.onPrimary,
                     fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  englishDate,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onPrimaryContainer.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -343,7 +335,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
             child: Align(
               alignment: Alignment.centerRight,
               child: Material(
-                color: colors.primary.withValues(alpha: 0.24),
+                color: colors.primaryContainer.withValues(alpha: 0.98),
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
@@ -358,7 +350,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
                       children: [
                         Icon(
                           Icons.location_on_rounded,
-                          color: colors.onPrimaryContainer,
+                          color: colors.primary,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
