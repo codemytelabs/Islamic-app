@@ -31,7 +31,12 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
     if (!mounted) return;
 
     if (cachedLocation != null && cachedLocation.trim().isNotEmpty) {
-      setState(() => _locationText = cachedLocation);
+      final normalizedCached = _normalizeCachedLocation(cachedLocation);
+      setState(() => _locationText = normalizedCached);
+
+      if (normalizedCached != cachedLocation) {
+        await prefs.setString(_cachedLocationKey, normalizedCached);
+      }
     }
 
     await _loadLocation();
@@ -90,6 +95,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
 
       if (places.isEmpty) {
         setState(() {
+          _isFetchingLocation = false;
           _needsLocationEnable = false;
           _locationText =
               '${position.latitude.toStringAsFixed(2)}, ${position.longitude.toStringAsFixed(2)}';
@@ -100,20 +106,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
       }
 
       final place = places.first;
-      final locality = place.locality?.trim();
-      final subAdministrativeArea = place.subAdministrativeArea?.trim();
-      final administrativeArea = place.administrativeArea?.trim();
-      final country = place.country?.trim();
-      final location = [
-        if (locality != null && locality.isNotEmpty) locality,
-        if (subAdministrativeArea != null && subAdministrativeArea.isNotEmpty)
-          subAdministrativeArea,
-        if (administrativeArea != null && administrativeArea.isNotEmpty)
-          administrativeArea,
-        if (country != null && country.isNotEmpty) country,
-      ].join(', ');
-
-      final resolvedLocation = location.isEmpty ? 'Current Location' : location;
+      final resolvedLocation = _formatCityCountryLocation(place);
 
       setState(() {
         _isFetchingLocation = false;
@@ -133,6 +126,134 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
         }
       });
     }
+  }
+
+  String _formatCityCountryLocation(Placemark place) {
+    final cityCandidates = [
+      place.locality,
+      place.subAdministrativeArea,
+      place.administrativeArea,
+    ];
+
+    String? city;
+    for (final candidate in cityCandidates) {
+      final parsed = _extractCityFromRaw(candidate);
+      if (parsed != null) {
+        city = parsed;
+        break;
+      }
+    }
+
+    final country = _extractCountryFromRaw(
+      place.country,
+      fallbackRawValues: cityCandidates,
+    );
+
+    if (city != null && country != null) {
+      if (city.toLowerCase() == country.toLowerCase()) {
+        return city;
+      }
+      return '$city, $country';
+    }
+
+    if (city != null) return city;
+    if (country != null) return country;
+
+    return 'Current Location';
+  }
+
+  String _normalizeCachedLocation(String rawLocation) {
+    return _cityCountryFromRaw(rawLocation);
+  }
+
+  String _cityCountryFromRaw(String rawLocation) {
+    final parts = rawLocation
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (parts.isEmpty) {
+      return 'Current Location';
+    }
+
+    if (parts.length == 1) {
+      return parts.first;
+    }
+
+    final city = parts.first;
+    final country = parts.last;
+
+    if (city.toLowerCase() == country.toLowerCase()) {
+      return city;
+    }
+
+    return '$city, $country';
+  }
+
+  String? _extractCityFromRaw(String? rawValue) {
+    if (rawValue == null || rawValue.trim().isEmpty) {
+      return null;
+    }
+
+    final segments = rawValue
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList(growable: false);
+
+    if (segments.isEmpty) {
+      return null;
+    }
+
+    for (final segment in segments) {
+      if (!_looksAdministrative(segment)) {
+        return segment;
+      }
+    }
+
+    return segments.first;
+  }
+
+  String? _extractCountryFromRaw(
+    String? rawCountry, {
+    required List<String?> fallbackRawValues,
+  }) {
+    if (rawCountry != null && rawCountry.trim().isNotEmpty) {
+      final segments = rawCountry
+          .split(',')
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList(growable: false);
+      if (segments.isNotEmpty) {
+        return segments.last;
+      }
+    }
+
+    for (final rawValue in fallbackRawValues) {
+      if (rawValue == null || rawValue.trim().isEmpty) {
+        continue;
+      }
+      final segments = rawValue
+          .split(',')
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList(growable: false);
+      if (segments.length > 1) {
+        return segments.last;
+      }
+    }
+
+    return null;
+  }
+
+  bool _looksAdministrative(String text) {
+    final value = text.toLowerCase();
+    return value.contains('province') ||
+        value.contains('district') ||
+        value.contains('state') ||
+        value.contains('region');
   }
 
   Future<void> _onLocationPressed() async {
@@ -246,7 +367,7 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
                             _isFetchingLocation
                                 ? 'Fetching location...'
                                 : _locationText,
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.end,
                             style: Theme.of(context).textTheme.bodySmall
