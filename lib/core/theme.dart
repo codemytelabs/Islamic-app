@@ -20,8 +20,8 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: Colors.white,
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: colorScheme.primary,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         elevation: 0,
         centerTitle: true,
       ),
