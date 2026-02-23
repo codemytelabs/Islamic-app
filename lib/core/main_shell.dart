@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../features/hijri/presentation/hijri_calendar_screen.dart';
+import '../features/mosques/presentation/nearby_mosques_screen.dart';
+import '../features/qibla/presentation/qibla_screen.dart';
+import '../shared/services/location_cache_service.dart';
 import '../shared/widgets/nafas_bottom_nav_bar.dart';
 import '../shared/widgets/app_side_menu_drawer.dart';
 import '../shared/widgets/home_hijri_location_card.dart';
@@ -21,6 +26,12 @@ class _MainShellState extends State<MainShell> {
     NafasNavItem(label: 'Guidance', icon: Icons.tips_and_updates_rounded),
     NafasNavItem(label: 'Tools', icon: Icons.widgets_rounded),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(LocationCacheService.instance.warmUp());
+  }
 
   List<Widget> _buildPages() {
     return [
@@ -45,21 +56,17 @@ class _MainShellState extends State<MainShell> {
         topWidget: const HomeHijriLocationCard(),
         onEntryTap: _onEntryTap,
       ),
-      _SectionPage(
-        entries: [
-          _EntryData(
-            'Prayer Times',
-            'View daily prayer schedule',
-            Icons.schedule_rounded,
-          ),
-          _EntryData(
-            'Qibla',
-            'Find the Qibla direction',
-            Icons.explore_rounded,
-          ),
-        ],
+      _PrayersTabContent(
         topWidget: const HomeHijriLocationCard(),
-        onEntryTap: _onEntryTap,
+        onOpenQibla: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const QiblaScreen(
+                topWidget: HomeHijriLocationCard(),
+              ),
+            ),
+          );
+        },
       ),
       _SectionPage(
         entries: [
@@ -131,6 +138,12 @@ class _MainShellState extends State<MainShell> {
             action: _EntryAction.openHijriCalendar,
           ),
           _EntryData(
+            'Qibla',
+            'Find the Qibla direction',
+            Icons.explore_rounded,
+            action: _EntryAction.openQibla,
+          ),
+          _EntryData(
             'Zakat Calculator',
             'Estimate zakat quickly',
             Icons.calculate_rounded,
@@ -146,6 +159,13 @@ class _MainShellState extends State<MainShell> {
       case _EntryAction.openHijriCalendar:
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const HijriCalendarScreen()),
+        );
+        break;
+      case _EntryAction.openQibla:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const QiblaScreen(topWidget: HomeHijriLocationCard()),
+          ),
         );
         break;
       case null:
@@ -197,6 +217,112 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
+class _PrayersTabContent extends StatelessWidget {
+  final Widget? topWidget;
+  final VoidCallback onOpenQibla;
+
+  const _PrayersTabContent({this.topWidget, required this.onOpenQibla});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (topWidget case final widget?) ...[
+          const SizedBox(height: 2),
+          widget,
+        ],
+        Card(
+          elevation: 0,
+          color: colors.tertiaryContainer.withValues(alpha: 0.30),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: const [
+                _PrayerTimeRow(name: 'Fajr', time: '05:01 AM'),
+                _PrayerTimeRow(name: 'Sunrise', time: '06:12 AM'),
+                _PrayerTimeRow(name: 'Dhuhr', time: '12:14 PM'),
+                _PrayerTimeRow(name: 'Asr', time: '03:43 PM'),
+                _PrayerTimeRow(name: 'Maghrib', time: '06:20 PM'),
+                _PrayerTimeRow(name: 'Isha', time: '07:31 PM'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onOpenQibla,
+                icon: const Icon(Icons.explore_rounded),
+                label: const Text('Find Qibla'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NearbyMosquesScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.location_city_rounded),
+                label: const Text('Mosques near me'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PrayerTimeRow extends StatelessWidget {
+  final String name;
+  final String time;
+
+  const _PrayerTimeRow({required this.name, required this.time});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(Icons.schedule_rounded, size: 18, color: colors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(
+            time,
+            style: TextStyle(
+              color: colors.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionPage extends StatelessWidget {
   final List<_EntryData> entries;
   final Widget? topWidget;
@@ -211,8 +337,10 @@ class _SectionPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (topWidget != null) const SizedBox(height: 2),
-        if (topWidget != null) topWidget!,
+        if (topWidget case final widget?) ...[
+          const SizedBox(height: 2),
+          widget,
+        ],
         ...entries.map((entry) {
           final iconBackground = colors.surface;
           final iconColor = colors.primaryFixed;
@@ -255,4 +383,4 @@ class _EntryData {
   const _EntryData(this.title, this.subtitle, this.icon, {this.action});
 }
 
-enum _EntryAction { openHijriCalendar }
+enum _EntryAction { openHijriCalendar, openQibla }

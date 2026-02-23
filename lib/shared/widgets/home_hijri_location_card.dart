@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/location_cache_service.dart';
 
 class HomeHijriLocationCard extends StatefulWidget {
   const HomeHijriLocationCard({super.key});
@@ -12,258 +12,29 @@ class HomeHijriLocationCard extends StatefulWidget {
 }
 
 class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
-  static const String _cachedLocationKey = 'cached_location_name';
-
-  String _locationText = 'Locating...';
-  bool _needsLocationEnable = false;
-  bool _isFetchingLocation = false;
+  final LocationCacheService _locationService = LocationCacheService.instance;
 
   @override
   void initState() {
     super.initState();
-    _restoreAndLoadLocation();
+    _locationService.addListener(_onLocationStateChanged);
+    _locationService.warmUp();
   }
 
-  Future<void> _restoreAndLoadLocation() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cachedLocation = prefs.getString(_cachedLocationKey);
-
+  void _onLocationStateChanged() {
     if (!mounted) return;
-
-    if (cachedLocation != null && cachedLocation.trim().isNotEmpty) {
-      final normalizedCached = _normalizeCachedLocation(cachedLocation);
-      setState(() => _locationText = normalizedCached);
-
-      if (normalizedCached != cachedLocation) {
-        await prefs.setString(_cachedLocationKey, normalizedCached);
-      }
-    }
-
-    await _loadLocation();
-  }
-
-  Future<void> _loadLocation() async {
-    if (mounted) {
-      setState(() => _isFetchingLocation = true);
-    }
-
-    try {
-      final locationServiceEnabled =
-          await Geolocator.isLocationServiceEnabled();
-      if (!locationServiceEnabled) {
-        if (!mounted) return;
-        setState(() {
-          _isFetchingLocation = false;
-          _needsLocationEnable = true;
-          if (_locationText == 'Locating...') {
-            _locationText = 'Enable location to fetch location';
-          }
-        });
-        return;
-      }
-
-      final permission = await Geolocator.checkPermission();
-      LocationPermission grantedPermission = permission;
-
-      if (permission == LocationPermission.denied) {
-        grantedPermission = await Geolocator.requestPermission();
-      }
-
-      if (grantedPermission == LocationPermission.denied ||
-          grantedPermission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-        setState(() {
-          _isFetchingLocation = false;
-          _needsLocationEnable = true;
-          if (_locationText == 'Locating...') {
-            _locationText = 'Enable location to fetch location';
-          }
-        });
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.low,
-      );
-
-      final places = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (!mounted) return;
-
-      if (places.isEmpty) {
-        setState(() {
-          _isFetchingLocation = false;
-          _needsLocationEnable = false;
-          _locationText =
-              '${position.latitude.toStringAsFixed(2)}, ${position.longitude.toStringAsFixed(2)}';
-        });
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_cachedLocationKey, _locationText);
-        return;
-      }
-
-      final place = places.first;
-      final resolvedLocation = _formatCityCountryLocation(place);
-
-      setState(() {
-        _isFetchingLocation = false;
-        _needsLocationEnable = false;
-        _locationText = resolvedLocation;
-      });
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cachedLocationKey, resolvedLocation);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isFetchingLocation = false;
-        _needsLocationEnable = true;
-        if (_locationText == 'Locating...') {
-          _locationText = 'Enable location to fetch location';
-        }
-      });
-    }
-  }
-
-  String _formatCityCountryLocation(Placemark place) {
-    final cityCandidates = [
-      place.locality,
-      place.subAdministrativeArea,
-      place.administrativeArea,
-    ];
-
-    String? city;
-    for (final candidate in cityCandidates) {
-      final parsed = _extractCityFromRaw(candidate);
-      if (parsed != null) {
-        city = parsed;
-        break;
-      }
-    }
-
-    final country = _extractCountryFromRaw(
-      place.country,
-      fallbackRawValues: cityCandidates,
-    );
-
-    if (city != null && country != null) {
-      if (city.toLowerCase() == country.toLowerCase()) {
-        return city;
-      }
-      return '$city, $country';
-    }
-
-    if (city != null) return city;
-    if (country != null) return country;
-
-    return 'Current Location';
-  }
-
-  String _normalizeCachedLocation(String rawLocation) {
-    return _cityCountryFromRaw(rawLocation);
-  }
-
-  String _cityCountryFromRaw(String rawLocation) {
-    final parts = rawLocation
-        .split(',')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toSet()
-        .toList(growable: false);
-
-    if (parts.isEmpty) {
-      return 'Current Location';
-    }
-
-    if (parts.length == 1) {
-      return parts.first;
-    }
-
-    final city = parts.first;
-    final country = parts.last;
-
-    if (city.toLowerCase() == country.toLowerCase()) {
-      return city;
-    }
-
-    return '$city, $country';
-  }
-
-  String? _extractCityFromRaw(String? rawValue) {
-    if (rawValue == null || rawValue.trim().isEmpty) {
-      return null;
-    }
-
-    final segments = rawValue
-        .split(',')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList(growable: false);
-
-    if (segments.isEmpty) {
-      return null;
-    }
-
-    for (final segment in segments) {
-      if (!_looksAdministrative(segment)) {
-        return segment;
-      }
-    }
-
-    return segments.first;
-  }
-
-  String? _extractCountryFromRaw(
-    String? rawCountry, {
-    required List<String?> fallbackRawValues,
-  }) {
-    if (rawCountry != null && rawCountry.trim().isNotEmpty) {
-      final segments = rawCountry
-          .split(',')
-          .map((part) => part.trim())
-          .where((part) => part.isNotEmpty)
-          .toList(growable: false);
-      if (segments.isNotEmpty) {
-        return segments.last;
-      }
-    }
-
-    for (final rawValue in fallbackRawValues) {
-      if (rawValue == null || rawValue.trim().isEmpty) {
-        continue;
-      }
-      final segments = rawValue
-          .split(',')
-          .map((part) => part.trim())
-          .where((part) => part.isNotEmpty)
-          .toList(growable: false);
-      if (segments.length > 1) {
-        return segments.last;
-      }
-    }
-
-    return null;
-  }
-
-  bool _looksAdministrative(String text) {
-    final value = text.toLowerCase();
-    return value.contains('province') ||
-        value.contains('district') ||
-        value.contains('state') ||
-        value.contains('region');
+    setState(() {});
   }
 
   Future<void> _onLocationPressed() async {
-    await _loadLocation();
+    await _locationService.refreshByUser();
+    if (!mounted) return;
 
-    if (!_needsLocationEnable) {
+    if (!_locationService.needsLocationEnable) {
       return;
     }
 
-    if (_needsLocationEnable) {
+    if (_locationService.needsLocationEnable) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
@@ -285,6 +56,12 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
       );
       return;
     }
+  }
+
+  @override
+  void dispose() {
+    _locationService.removeListener(_onLocationStateChanged);
+    super.dispose();
   }
 
   @override
@@ -356,9 +133,9 @@ class _HomeHijriLocationCardState extends State<HomeHijriLocationCard> {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            _isFetchingLocation
+                            _locationService.isFetching
                                 ? 'Fetching location...'
-                                : _locationText,
+                              : _locationService.locationText,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.end,
