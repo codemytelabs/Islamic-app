@@ -38,6 +38,11 @@ dependencies:
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   shared_preferences: ^2.5.3
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  flutter_compass: ^0.8.1
+  sensors_plus: ^6.1.1
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
