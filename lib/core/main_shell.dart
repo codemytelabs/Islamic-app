@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../features/hijri/presentation/hijri_calendar_screen.dart';
 import '../features/mosques/presentation/nearby_mosques_screen.dart';
+import '../features/quran/presentation/quran_screen.dart';
 import '../features/qibla/presentation/qibla_screen.dart';
 import '../shared/services/location_cache_service.dart';
 import '../shared/widgets/nafas_bottom_nav_bar.dart';
@@ -68,31 +69,7 @@ class _MainShellState extends State<MainShell> {
           );
         },
       ),
-      _SectionPage(
-        entries: [
-          _EntryData(
-            'Read Quran',
-            'Continue from your last ayah',
-            Icons.menu_book_rounded,
-          ),
-          _EntryData(
-            'Bookmarks',
-            'Quick access to saved surahs',
-            Icons.bookmarks_rounded,
-          ),
-          _EntryData(
-            'Tafsir',
-            'Understand verses with explanations',
-            Icons.chrome_reader_mode_rounded,
-          ),
-          _EntryData(
-            'Audio Recitation',
-            'Listen by your preferred reciter',
-            Icons.graphic_eq_rounded,
-          ),
-        ],
-        onEntryTap: _onEntryTap,
-      ),
+      const QuranScreen(),
       _SectionPage(
         entries: [
           _EntryData('Duas', 'Curated daily duas', Icons.favorite_rounded),

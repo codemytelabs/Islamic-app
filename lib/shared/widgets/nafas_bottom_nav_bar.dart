@@ -23,20 +23,30 @@ class NafasBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: onDestinationSelected,
-        indicatorColor: colors.primaryContainer,
-        destinations: items
-            .map(
-              (item) => NavigationDestination(
-                icon: Icon(item.icon),
-                label: item.label,
-              ),
-            )
-            .toList(growable: false),
+    return ColoredBox(
+      color: colors.surface,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(height: 1, color: colors.outlineVariant),
+          NavigationBar(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: onDestinationSelected,
+            indicatorColor: colors.primaryContainer,
+            backgroundColor: colors.surface,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            destinations: items
+                .map(
+                  (item) => NavigationDestination(
+                    icon: Icon(item.icon),
+                    label: item.label,
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ],
       ),
     );
   }
