@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum QuranViewTab { chapters, juz, bookmarks }
+enum QuranViewTab { chapters, juz, bookmarks, playlists }
 
 class QuranTopTabs extends StatelessWidget {
   final QuranViewTab selected;
@@ -56,6 +56,8 @@ class QuranTopTabs extends StatelessWidget {
           tabItem(QuranViewTab.juz, 'Juz'),
           const SizedBox(width: 6),
           tabItem(QuranViewTab.bookmarks, 'Bookmarks'),
+          const SizedBox(width: 6),
+          tabItem(QuranViewTab.playlists, 'Playlists'),
         ],
       ),
     );

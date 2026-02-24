@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/quran_bookmark_store.dart';
 import '../data/quran_repository.dart';
+import '../domain/quran_bookmark.dart';
 import '../domain/quran_chapter.dart';
 import '../domain/quran_verse.dart';
 import 'widgets/quran_top_tabs.dart';
@@ -15,6 +17,7 @@ class QuranScreen extends StatefulWidget {
 class _QuranScreenState extends State<QuranScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final QuranRepository _repository = QuranRepository.instance;
+  final QuranBookmarkStore _bookmarkStore = QuranBookmarkStore.instance;
 
   QuranViewTab _selectedTab = QuranViewTab.chapters;
   List<QuranChapter> _chapters = const [];
@@ -27,12 +30,27 @@ class _QuranScreenState extends State<QuranScreen> {
   bool _showTafsirForAll = false;
   final Set<String> _expandedTranslationVerses = <String>{};
   final Set<String> _expandedTafsirVerses = <String>{};
-  final Set<String> _bookmarkedVerses = <String>{};
+  List<QuranBookmark> _bookmarks = const [];
+  bool _isLoadingBookmarks = true;
 
   @override
   void initState() {
     super.initState();
+    _loadBookmarks();
     _loadChapters();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final loaded = await _bookmarkStore.loadAll();
+    if (!mounted) return;
+    setState(() {
+      _bookmarks = loaded;
+      _isLoadingBookmarks = false;
+    });
+  }
+
+  Future<void> _saveBookmarks() async {
+    await _bookmarkStore.saveAll(_bookmarks);
   }
 
   Future<void> _loadChapters() async {
@@ -222,6 +240,10 @@ class _QuranScreenState extends State<QuranScreen> {
       return _showTafsirForAll || _expandedTafsirVerses.contains(verse.verseKey);
     }
 
+    bool isBookmarked(QuranVerse verse) {
+      return _bookmarks.any((item) => item.verseKey == verse.verseKey);
+    }
+
     void toggleVerseTranslation(QuranVerse verse) {
       setState(() {
         if (_expandedTranslationVerses.contains(verse.verseKey)) {
@@ -242,14 +264,41 @@ class _QuranScreenState extends State<QuranScreen> {
       });
     }
 
-    void toggleBookmark(QuranVerse verse) {
+    Future<void> toggleBookmark(QuranVerse verse) async {
+      final existingIndex =
+          _bookmarks.indexWhere((item) => item.verseKey == verse.verseKey);
+
+      if (existingIndex >= 0) {
+        setState(() {
+          _bookmarks = List<QuranBookmark>.from(_bookmarks)
+            ..removeAt(existingIndex);
+        });
+        await _saveBookmarks();
+        return;
+      }
+
+      final note = await _showBookmarkNoteDialog(verse);
+      if (!mounted || note == null) return;
+
+      final chapter = _selectedChapter;
+      if (chapter == null) return;
+
+      final bookmark = QuranBookmark(
+        verseKey: verse.verseKey,
+        chapterId: chapter.id,
+        chapterEnglishName: chapter.englishName,
+        chapterArabicName: chapter.arabicName,
+        verseNumber: verse.verseNumber,
+        arabicText: verse.arabicText,
+        translationText: verse.translationText,
+        note: note.trim(),
+        savedAt: DateTime.now(),
+      );
+
       setState(() {
-        if (_bookmarkedVerses.contains(verse.verseKey)) {
-          _bookmarkedVerses.remove(verse.verseKey);
-        } else {
-          _bookmarkedVerses.add(verse.verseKey);
-        }
+        _bookmarks = [bookmark, ..._bookmarks];
       });
+      await _saveBookmarks();
     }
 
     return Column(
@@ -348,7 +397,7 @@ class _QuranScreenState extends State<QuranScreen> {
                     final verse = _verses[index];
                     final showTranslation = shouldShowTranslation(verse);
                     final showTafsir = shouldShowTafsir(verse);
-                    final isBookmarked = _bookmarkedVerses.contains(verse.verseKey);
+                    final bookmarked = isBookmarked(verse);
 
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(2, 10, 2, 10),
@@ -393,9 +442,9 @@ class _QuranScreenState extends State<QuranScreen> {
                                 tooltip: 'Show tafsir',
                               ),
                               IconButton(
-                                onPressed: () => toggleBookmark(verse),
+                                onPressed: () async => toggleBookmark(verse),
                                 icon: Icon(
-                                  isBookmarked
+                                  bookmarked
                                       ? Icons.bookmark_rounded
                                       : Icons.bookmark_border_rounded,
                                   size: 16,
@@ -435,7 +484,123 @@ class _QuranScreenState extends State<QuranScreen> {
   }
 
   Widget _buildBookmarksPlaceholder(BuildContext context) {
-    return const Center(child: Text('Bookmarks coming soon'));
+    if (_isLoadingBookmarks) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_bookmarks.isEmpty) {
+      return const Center(child: Text('No bookmarked verses yet'));
+    }
+
+    return ListView.separated(
+      itemCount: _bookmarks.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = _bookmarks[index];
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            title: Text('${item.chapterEnglishName} • ${item.verseKey}'),
+            subtitle: Text(
+              item.note.isEmpty
+                  ? item.arabicText
+                  : '${item.note}\n${item.arabicText}',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            isThreeLine: item.note.isNotEmpty,
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: () async {
+                setState(() {
+                  _bookmarks = List<QuranBookmark>.from(_bookmarks)
+                    ..removeAt(index);
+                });
+                await _saveBookmarks();
+              },
+            ),
+            onTap: () async {
+              final chapter = _findChapterById(item.chapterId);
+              if (chapter == null) return;
+              setState(() {
+                _selectedTab = QuranViewTab.chapters;
+                _selectedChapter = chapter;
+              });
+              await _loadVerses(chapter.id);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlaylistsPlaceholder(BuildContext context) {
+    return const Center(child: Text('Playlists coming soon'));
+  }
+
+  Future<String?> _showBookmarkNoteDialog(QuranVerse verse) async {
+    var draftNote = '';
+
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            verse.verseKey.isNotEmpty
+                ? 'Bookmark ${verse.verseKey}'
+                : 'Bookmark Ayah ${verse.verseNumber}',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Verse ${verse.verseNumber}',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                initialValue: draftNote,
+                maxLines: 4,
+                onChanged: (value) => draftNote = value,
+                decoration: const InputDecoration(
+                  hintText: 'Add note (optional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                Navigator.of(context).pop(null);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                Navigator.of(context).pop(draftNote);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return note;
+  }
+
+  QuranChapter? _findChapterById(int chapterId) {
+    for (final chapter in _chapters) {
+      if (chapter.id == chapterId) {
+        return chapter;
+      }
+    }
+    return null;
   }
 
   @override
@@ -454,6 +619,7 @@ class _QuranScreenState extends State<QuranScreen> {
                 QuranViewTab.chapters => _buildChaptersContent(context),
                 QuranViewTab.juz => _buildJuzPlaceholder(context),
                 QuranViewTab.bookmarks => _buildBookmarksPlaceholder(context),
+                QuranViewTab.playlists => _buildPlaylistsPlaceholder(context),
               },
             ),
           ],
