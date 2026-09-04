@@ -7,6 +7,8 @@ import '../domain/quran_chapter.dart';
 import '../domain/quran_verse.dart';
 import 'widgets/quran_top_tabs.dart';
 
+enum QuranVerseDisplayMode { byVerse, byPage }
+
 class QuranScreen extends StatefulWidget {
   const QuranScreen({super.key});
 
@@ -28,6 +30,7 @@ class _QuranScreenState extends State<QuranScreen> {
   String? _error;
   bool _showTranslationForAll = false;
   bool _showTafsirForAll = false;
+  QuranVerseDisplayMode _verseDisplayMode = QuranVerseDisplayMode.byVerse;
   final Set<String> _expandedTranslationVerses = <String>{};
   final Set<String> _expandedTafsirVerses = <String>{};
   List<QuranBookmark> _bookmarks = const [];
@@ -92,7 +95,11 @@ class _QuranScreenState extends State<QuranScreen> {
     });
 
     try {
-      final verses = await _repository.getVersesByChapter(chapterId);
+      final chapter = _selectedChapter;
+      final verses = _verseDisplayMode == QuranVerseDisplayMode.byVerse ||
+              chapter == null
+          ? await _repository.getVersesByChapter(chapterId)
+          : await _repository.getVersesByChapterPages(chapter);
       if (!mounted) return;
       setState(() {
         _verses = verses;
@@ -129,6 +136,18 @@ class _QuranScreenState extends State<QuranScreen> {
     });
     Navigator.of(context).pop();
     _loadVerses(chapter.id);
+  }
+
+  Future<void> _toggleVerseDisplayMode(QuranVerseDisplayMode mode) async {
+    if (_verseDisplayMode == mode) return;
+    setState(() {
+      _verseDisplayMode = mode;
+    });
+
+    final chapter = _selectedChapter;
+    if (chapter != null) {
+      await _loadVerses(chapter.id);
+    }
   }
 
   Widget _buildChapterDrawer(BuildContext context) {
@@ -345,6 +364,28 @@ class _QuranScreenState extends State<QuranScreen> {
             const SizedBox(width: 10),
             const Spacer(),
             IconButton(
+              tooltip: 'Verse by verse',
+              onPressed: () => _toggleVerseDisplayMode(QuranVerseDisplayMode.byVerse),
+              icon: Icon(
+                _verseDisplayMode == QuranVerseDisplayMode.byVerse
+                    ? Icons.format_list_numbered_rounded
+                    : Icons.format_list_numbered_outlined,
+                size: 18,
+              ),
+              visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            ),
+            IconButton(
+              tooltip: 'Page by page tilawah',
+              onPressed: () => _toggleVerseDisplayMode(QuranVerseDisplayMode.byPage),
+              icon: Icon(
+                _verseDisplayMode == QuranVerseDisplayMode.byPage
+                    ? Icons.chrome_reader_mode_rounded
+                    : Icons.chrome_reader_mode_outlined,
+                size: 18,
+              ),
+              visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            ),
+            IconButton(
               tooltip: 'Toggle translation for all verses',
               onPressed: () {
                 setState(() {
@@ -377,6 +418,27 @@ class _QuranScreenState extends State<QuranScreen> {
           ],
         ),
         const SizedBox(height: 8),
+        if (_selectedChapter?.hasBismillahPre == true) ...[
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'بِسْمِ ٱللَّٰهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.rtl,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
         Expanded(
           child: _isLoadingVerses
               ? const Center(child: CircularProgressIndicator())

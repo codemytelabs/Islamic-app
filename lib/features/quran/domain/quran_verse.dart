@@ -4,6 +4,7 @@ class QuranVerse {
   final String arabicText;
   final String translationText;
   final String tafsirText;
+  final int pageNumber;
 
   const QuranVerse({
     required this.verseNumber,
@@ -11,6 +12,7 @@ class QuranVerse {
     required this.arabicText,
     required this.translationText,
     required this.tafsirText,
+    required this.pageNumber,
   });
 
   factory QuranVerse.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,7 @@ class QuranVerse {
       arabicText: text,
       translationText: _sanitizeText((translation['text'] as String?) ?? ''),
       tafsirText: _sanitizeText((tafsir['text'] as String?) ?? ''),
+      pageNumber: (json['page_number'] as num?)?.toInt() ?? 0,
     );
   }
 
